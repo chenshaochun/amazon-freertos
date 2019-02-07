@@ -857,6 +857,7 @@ static BaseType_t prvSetupConnection( const MQTTEventData_t * const pxEventData 
     size_t xURLLength;
     MQTTBrokerConnection_t * pxConnection = &( xMQTTConnections[ pxEventData->uxBrokerNumber ] );
     char * ppcAlpns[] = { socketsAWS_IOT_ALPN_MQTT };
+    TickType_t xMqttTimeout;
 
     /* Should not get here if the socket used to communicate with the
      * broker is already connected. */
@@ -949,6 +950,34 @@ static BaseType_t prvSetupConnection( const MQTTEventData_t * const pxEventData 
                         xStatus = pdFAIL;
                     }
                 }
+
+                    /* Set the Send Timeout of Socket to mqttconfigTCP_SEND_TIMEOUT_MS to block on sends. */
+                    if ( xStatus == pdPASS )
+                    {
+                        xMqttTimeout = ( pdMS_TO_TICKS ) mqttconfigTCP_SEND_TIMEOUT_MS;
+                        if( SOCKETS_SetSockOpt( pxConnection->xSocket,
+                                                 0, /* Level - Unused. */
+                                                 SOCKETS_SO_SNDTIMEO,
+                                                 &xMqttTimeout,
+                                                 sizeof( TickType_t ) ) != SOCKETS_ERROR_NONE )
+                        {
+                            xStatus = pdFAIL;
+                        }
+                    }
+
+                    /* Set the Receive Timeout of Socket to 0 for it to behave as non-blocking receive. */
+                    if ( xStatus == pdPASS )
+                    {
+                        xMqttTimeout = 0U;
+                        if( SOCKETS_SetSockOpt( pxConnection->xSocket,
+                                                 0, /* Level - Unused. */
+                                                 SOCKETS_SO_RCVTIMEO,
+                                                 &xMqttTimeout,
+                                                 sizeof( TickType_t ) ) != SOCKETS_ERROR_NONE )
+                        {
+                            xStatus = pdFAIL;
+                        }
+                    }
             }
 
             /* Establish the connection. */
